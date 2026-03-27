@@ -1,44 +1,77 @@
-//! A shader that uses dynamic data like the time since startup.
-//! The time data is in the globals binding which is part of the `mesh_view_bindings` shader import.
+use bevy::prelude::*;
+use bevy::sprite_render::{Material2d, Material2dPlugin, MeshMaterial2d};
+use bevy::mesh::{Mesh, Mesh2d};
+use bevy::render::render_resource::*;
+use bevy::math::primitives::Rectangle;
+use bevy::shader::ShaderRef;
+use bevy::window::Window;
+use bevy::window::PrimaryWindow;
 
-use bevy::{
-    prelude::*, reflect::TypePath, render::render_resource::AsBindGroup, shader::ShaderRef,
-};
-
-/// This example uses a shader source file from the assets subdirectory
-const SHADER_ASSET_PATH: &str = "shaders/animate_shader.wgsl";
-
-fn main() {
+fn main()
+{
     App::new()
-        .add_plugins((DefaultPlugins, MaterialPlugin::<CustomMaterial>::default()))
+        .add_plugins(DefaultPlugins)
+        .add_plugins(Material2dPlugin::<FullscreenMaterial>::default())
         .add_systems(Startup, setup)
+        .add_systems(Update, update_resolution)
+        // .add_systems(Update, update_time)
         .run();
 }
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<CustomMaterial>>,
-) {
-    // cube
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::default())),
-        MeshMaterial3d(materials.add(CustomMaterial {})),
-        Transform::from_xyz(0.0, 0.5, 0.0),
-    ));
+    mut materials: ResMut<Assets<FullscreenMaterial>>,
+)
+{
+    commands.spawn(Camera2d);
 
-    // camera
+    let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
+
     commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Mesh2d(mesh),
+        MeshMaterial2d(materials.add(FullscreenMaterial {
+            resolution: Vec2::ZERO, // will be set next frame
+        })),
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 }
 
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct CustomMaterial {}
+fn update_resolution(
+    windows: Query<&Window, With<PrimaryWindow>>,
+    mut materials: ResMut<Assets<FullscreenMaterial>>,
+) 
+{
+    let window = windows.single().unwrap();
 
-impl Material for CustomMaterial {
+    let res = Vec2::new(
+        window.physical_width() as f32,
+        window.physical_height() as f32,
+    );
+
+    for (_, mat) in materials.iter_mut() {
+        mat.resolution = res;
+    }
+}
+
+// fn update_time(
+//     time: Res<Time>,
+//     mut materials: ResMut<Assets<FullscreenMaterial>>,
+// )
+// {
+//     for (_, mat) in materials.iter_mut() {
+//         mat.time = time.elapsed_secs();
+//     }
+// }
+
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct FullscreenMaterial {
+    #[uniform(0)] resolution : Vec2,
+    // #[uniform(1)] time : f32,
+}
+
+impl Material2d for FullscreenMaterial {
     fn fragment_shader() -> ShaderRef {
-        SHADER_ASSET_PATH.into()
+        "shaders/animate_shader.wgsl".into()
     }
 }
