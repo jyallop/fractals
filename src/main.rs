@@ -14,7 +14,7 @@ fn main()
         .add_plugins(Material2dPlugin::<FullscreenMaterial>::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update_resolution)
-        // .add_systems(Update, update_time)
+        .add_systems(Update, update_time)
         .run();
 }
 
@@ -32,6 +32,7 @@ fn setup(
         Mesh2d(mesh),
         MeshMaterial2d(materials.add(FullscreenMaterial {
             resolution: Vec2::ZERO, // will be set next frame
+            time : 0.0,
         })),
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
@@ -54,20 +55,20 @@ fn update_resolution(
     }
 }
 
-// fn update_time(
-//     time: Res<Time>,
-//     mut materials: ResMut<Assets<FullscreenMaterial>>,
-// )
-// {
-//     for (_, mat) in materials.iter_mut() {
-//         mat.time = time.elapsed_secs();
-//     }
-// }
+fn update_time(
+    time: Res<Time>,
+    mut materials: ResMut<Assets<FullscreenMaterial>>,
+)
+{
+    for (_, mat) in materials.iter_mut() {
+        mat.time = time.elapsed_secs();
+    }
+}
 
 #[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
 struct FullscreenMaterial {
     #[uniform(0)] resolution : Vec2,
-    // #[uniform(1)] time : f32,
+    #[uniform(1)] time : f32,
 }
 
 impl Material2d for FullscreenMaterial {

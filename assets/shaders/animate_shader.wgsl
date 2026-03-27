@@ -1,22 +1,15 @@
-/* struct MaterialUniform { */
-/*     resolution: vec2<f32>, */
-/*     time: f32, */
-/* }; */
-
-@group(2) @binding(0)
-var<uniform> resolution: vec2f;
+@group(2) @binding(0) var<uniform> resolution: vec2f;
+@group(2) @binding(1) var<uniform> time: f32;
 
 @fragment
 fn fragment(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f
 {
-	/* let resolution = material.resolution; */
-
     // Normalize to [0,1]
     let UV = frag_coord.xy / resolution;
 	var P = 2 * UV - 1.0;
 	P.x *= resolution.x / resolution.y;
 
-	var Sdf = CircleSdf(P, 0.5);
+	var Sdf = CircleSdf(P, 0.5 + 0.1 * sin(time));
 	var Ret = vec4f();
 
 	var col = select(vec3f(0.65, 0.85, 1.0), vec3f(0.9, 0.6, 0.3), Sdf > 0.0);
