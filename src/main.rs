@@ -73,6 +73,6 @@ struct FullscreenMaterial {
 
 impl Material2d for FullscreenMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/animate_shader.wgsl".into()
+        "shaders/fractal_shader.wgsl".into()
     }
 }
