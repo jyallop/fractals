@@ -1,5 +1,7 @@
 @group(2) @binding(0) var<uniform> resolution: vec2f;
 @group(2) @binding(1) var<uniform> time: f32;
+@group(2) @binding(2) var<uniform> _mu: vec4f;
+@group(2) @binding(3) var<uniform> _col: vec3f;
 
 const BOUNDING_RADIUS_2 : f32 = 3.0;
 const ESCAPE_THRESHOLD : f32 = 10.0;
@@ -43,7 +45,7 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) vec4f
 	var epsilon = 0.003;
 	var iterations : u32 = 10;
 
-	var color = qjulia(ro, rd, mu, epsilon, eye.xyz, light.xyz, true, iterations);
+	var color = qjulia(ro, rd, _mu, epsilon, eye.xyz, light.xyz, true, iterations);
 
 	return color;
 }
@@ -162,7 +164,7 @@ fn phong(
 	p : v3,
 	n : v3) -> v3
 {
-	var diffuse = v3(169.0 / 255.0, 140.0 / 255.0, 112.0 / 255.0);
+	var diffuse = _col; //v3(169.0 / 255.0, 140.0 / 255.0, 112.0 / 255.0);
 	var spec_exp : f32 = 10.0;
 	var specularity : f32 = 0.45;
 
