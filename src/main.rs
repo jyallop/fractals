@@ -44,7 +44,13 @@ fn setup(
         window.physical_height() as f32,
     );
     let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
-
+    commands.insert_resource(State {
+        mu_a : Vec4::new(-0.278, -0.479,  0.0,   0.0),
+        mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
+        col_a : Vec3::new(0.24, 0.45, 1.0),
+        col_b : Vec3::new(0.24, 0.45, 1.0),
+        t : 0.0,
+    });
     commands.spawn((
         Mesh2d(mesh.clone()),
         MeshMaterial2d(material_an.add(AnimateMaterial {
@@ -52,11 +58,6 @@ fn setup(
             time : 0.0,
             mu: Vec4::ZERO,
             col: Vec3::ZERO,
-            mu_a : Vec4::new(-0.278, -0.479,  0.0,   0.0),
-            mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
-            col_a : Vec3::new(0.24, 0.45, 1.0),
-            col_b : Vec3::new(0.24, 0.45, 1.0),
-            t : 0.0,
         })),
         Mat::Mandel,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
@@ -78,6 +79,7 @@ fn update_time(
     mut commands: Commands,
     dmats: Query<(Entity, &Mat), With<Disabled>>,
     emats: Query<(Entity, &Mat), Without<Disabled>>,
+    mut state: ResMut<State>,
     mut material_man: ResMut<Assets<MandelbrotMaterial>>,
     mut material_an: ResMut<Assets<AnimateMaterial>>,
 )
@@ -92,41 +94,41 @@ fn update_time(
 
         let mut col_c : Vec3 = Vec3::new(0.24, 0.45, 1.0);
 
-        mat.t += dt;
+        state.t += dt;
 
-        if mat.t >= 1.0
+        if state.t >= 1.0
         {
-            mat.t = 0.0;
+            state.t = 0.0;
             let mut g = rand::rng();
             let mut rng = Uniform::new_inclusive(0.0, 1.0).unwrap().sample_iter(&mut g);
 
-            mat.mu_a[0] = mat.mu_b[0];
-            mat.mu_a[1] = mat.mu_b[1];
-            mat.mu_a[2] = mat.mu_b[2];
-            mat.mu_a[3] = mat.mu_b[3];
+            state.mu_a[0] = state.mu_b[0];
+            state.mu_a[1] = state.mu_b[1];
+            state.mu_a[2] = state.mu_b[2];
+            state.mu_a[3] = state.mu_b[3];
 
-            mat.mu_b[0] = rng.next().unwrap();
-            mat.mu_b[1] = rng.next().unwrap();
-            mat.mu_b[2] = rng.next().unwrap();
-            mat.mu_b[3] = rng.next().unwrap();
+            state.mu_b[0] = rng.next().unwrap();
+            state.mu_b[1] = rng.next().unwrap();
+            state.mu_b[2] = rng.next().unwrap();
+            state.mu_b[3] = rng.next().unwrap();
 
-            mat.col_a[0] = mat.col_b[0];
-            mat.col_a[1] = mat.col_b[1];
-            mat.col_a[2] = mat.col_b[2];
+            state.col_a[0] = state.col_b[0];
+            state.col_a[1] = state.col_b[1];
+            state.col_a[2] = state.col_b[2];
 
-            mat.col_b[0] = rng.next().unwrap();
-            mat.col_b[1] = rng.next().unwrap();
-            mat.col_b[2] = rng.next().unwrap();
+            state.col_b[0] = rng.next().unwrap();
+            state.col_b[1] = rng.next().unwrap();
+            state.col_b[2] = rng.next().unwrap();
         }
 
-        mu_c[0] = (1.0 - mat.t) * mat.mu_a[0] + mat.t * mat.mu_b[0];
-        mu_c[1] = (1.0 - mat.t) * mat.mu_a[1] + mat.t * mat.mu_b[1];
-        mu_c[2] = (1.0 - mat.t) * mat.mu_a[2] + mat.t * mat.mu_b[2];
-        mu_c[3] = (1.0 - mat.t) * mat.mu_a[3] + mat.t * mat.mu_b[3];
+        mu_c[0] = (1.0 - state.t) * state.mu_a[0] + state.t * state.mu_b[0];
+        mu_c[1] = (1.0 - state.t) * state.mu_a[1] + state.t * state.mu_b[1];
+        mu_c[2] = (1.0 - state.t) * state.mu_a[2] + state.t * state.mu_b[2];
+        mu_c[3] = (1.0 - state.t) * state.mu_a[3] + state.t * state.mu_b[3];
 
-        col_c[0] = (1.0 - mat.t) * mat.col_a[0] + mat.t * mat.col_b[0];
-        col_c[1] = (1.0 - mat.t) * mat.col_a[1] + mat.t * mat.col_b[1];
-        col_c[2] = (1.0 - mat.t) * mat.col_a[2] + mat.t * mat.col_b[2];
+        col_c[0] = (1.0 - state.t) * state.col_a[0] + state.t * state.col_b[0];
+        col_c[1] = (1.0 - state.t) * state.col_a[1] + state.t * state.col_b[1];
+        col_c[2] = (1.0 - state.t) * state.col_a[2] + state.t * state.col_b[2];
 
         mat.mu = mu_c;
         mat.col = col_c;
@@ -177,15 +179,19 @@ struct AnimateMaterial {
     #[uniform(1)] time : f32,
     #[uniform(2)] mu : Vec4,
     #[uniform(3)] col : Vec3,
-    mu_a : Vec4,
-    mu_b : Vec4,
-    col_a : Vec3,
-    col_b : Vec3,
-    t : f32,
 }
 
 impl Material2d for AnimateMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/qjulia_shader.wgsl".into()
     }
+}
+
+#[derive(Resource)]
+struct State {
+    mu_a : Vec4,
+    mu_b : Vec4,
+    col_a : Vec3,
+    col_b : Vec3,
+    t : f32,
 }
