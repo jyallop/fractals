@@ -1,3 +1,5 @@
+#![allow(nonstandard_style)]
+
 use bevy::prelude::*;
 use bevy::sprite_render::{Material2d, Material2dPlugin, MeshMaterial2d};
 use bevy::mesh::{Mesh, Mesh2d};
@@ -7,7 +9,7 @@ use bevy::shader::ShaderRef;
 use bevy::window::Window;
 use bevy::window::PrimaryWindow;
 use bevy::ecs::entity_disabling::Disabled;
-use rand::prelude::*;
+use rand::{distr::Uniform, prelude::*};
 
 #[derive(Component)]
 enum Mat {
@@ -35,26 +37,30 @@ fn setup(
 )
 {
     commands.spawn(Camera2d);
-
-    let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
     let window = windows.single().unwrap();
 
     let res = Vec2::new(
         window.physical_width() as f32,
         window.physical_height() as f32,
     );
+    let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
 
-    let transform = Transform {
-        scale: Vec3::new(2000.0, 2000.0, 1.0),
-        translation: Vec3::new(0.0, 0.0, 0.0),
-        ..default()
-    };
-
-    let transform_two = Transform {
-        scale: Vec3::new(2000.0, 2000.0, 1.0),
-        translation: Vec3::new(0.0, 0.0, 0.0),
-        ..default()
-    };
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(material_an.add(AnimateMaterial {
+            resolution: res.clone(), // will be set next frame
+            time : 0.0,
+            mu: Vec4::ZERO,
+            col: Vec3::ZERO,
+            mu_a : Vec4::new(-0.278, -0.479,  0.0,   0.0),
+            mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
+            col_a : Vec3::new(0.24, 0.45, 1.0),
+            col_b : Vec3::new(0.24, 0.45, 1.0),
+            t : 0.0,
+        })),
+        Mat::Mandel,
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+    ));
 
     commands.spawn((
         Mesh2d(mesh.clone()),
@@ -63,19 +69,8 @@ fn setup(
             time : 0.0,
         })),
         Mat::Mandel,
-        transform.clone()
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
-
-    commands.spawn((
-        Mesh2d(mesh),
-        MeshMaterial2d(material_an.add(AnimateMaterial {
-            resolution: res, // will be set next frame
-            time : 0.0,
-        })),
-        transform_two,
-        Mat::Animate,
-    ));
-
 }
 
 fn update_time(
@@ -88,17 +83,61 @@ fn update_time(
 )
 {
     let mut max_time = 0.0;
-    for (_, mat) in material_man.iter_mut() {
+    for (_, mat) in material_an.iter_mut() {
         mat.time += time.delta_secs();
         max_time = mat.time;
+        let dt : f32 = time.delta_secs();
+
+        let mut mu_c : Vec4 = Vec4::new(-0.278, -0.479, -0.231, 0.235);
+
+        let mut col_c : Vec3 = Vec3::new(0.24, 0.45, 1.0);
+
+        mat.t += dt;
+
+        if mat.t >= 1.0
+        {
+            mat.t = 0.0;
+            let mut g = rand::rng();
+            let mut rng = Uniform::new_inclusive(0.0, 1.0).unwrap().sample_iter(&mut g);
+
+            mat.mu_a[0] = mat.mu_b[0];
+            mat.mu_a[1] = mat.mu_b[1];
+            mat.mu_a[2] = mat.mu_b[2];
+            mat.mu_a[3] = mat.mu_b[3];
+
+            mat.mu_b[0] = rng.next().unwrap();
+            mat.mu_b[1] = rng.next().unwrap();
+            mat.mu_b[2] = rng.next().unwrap();
+            mat.mu_b[3] = rng.next().unwrap();
+
+            mat.col_a[0] = mat.col_b[0];
+            mat.col_a[1] = mat.col_b[1];
+            mat.col_a[2] = mat.col_b[2];
+
+            mat.col_b[0] = rng.next().unwrap();
+            mat.col_b[1] = rng.next().unwrap();
+            mat.col_b[2] = rng.next().unwrap();
+        }
+
+        mu_c[0] = (1.0 - mat.t) * mat.mu_a[0] + mat.t * mat.mu_b[0];
+        mu_c[1] = (1.0 - mat.t) * mat.mu_a[1] + mat.t * mat.mu_b[1];
+        mu_c[2] = (1.0 - mat.t) * mat.mu_a[2] + mat.t * mat.mu_b[2];
+        mu_c[3] = (1.0 - mat.t) * mat.mu_a[3] + mat.t * mat.mu_b[3];
+
+        col_c[0] = (1.0 - mat.t) * mat.col_a[0] + mat.t * mat.col_b[0];
+        col_c[1] = (1.0 - mat.t) * mat.col_a[1] + mat.t * mat.col_b[1];
+        col_c[2] = (1.0 - mat.t) * mat.col_a[2] + mat.t * mat.col_b[2];
+
+        mat.mu = mu_c;
+        mat.col = col_c;
     }
 
-    for (_, mat) in material_an.iter_mut() {
+    for (_, mat) in material_man.iter_mut() {
         mat.time += time.delta_secs();
         if mat.time > max_time { max_time = mat.time; }
     }
 
-    if max_time > 10.0 {
+    if max_time > 2.0 {
         let mut rng = rand::rng();
         let next_ind = (0..dmats.count()).choose(&mut rng);
         let next = dmats.iter().next();
@@ -136,10 +175,17 @@ impl Material2d for MandelbrotMaterial {
 struct AnimateMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] mu : Vec4,
+    #[uniform(3)] col : Vec3,
+    mu_a : Vec4,
+    mu_b : Vec4,
+    col_a : Vec3,
+    col_b : Vec3,
+    t : f32,
 }
 
 impl Material2d for AnimateMaterial {
     fn fragment_shader() -> ShaderRef {
-       "shaders/fract_two_shader.wgsl".into()
+        "shaders/qjulia_shader.wgsl".into()
     }
 }
