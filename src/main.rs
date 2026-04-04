@@ -15,6 +15,7 @@ use rand::{distr::Uniform, prelude::*};
 enum Mat {
      Mandelbrot,
      QuatJulia,
+     Mandelbulb,
 }
 
 fn main()
@@ -23,6 +24,7 @@ fn main()
         .add_plugins(DefaultPlugins)
         .add_plugins(Material2dPlugin::<MandelbrotMaterial>::default())
         .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
+        .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update_time)
         .run();
@@ -34,6 +36,7 @@ fn setup(
     windows: Query<&Window, With<PrimaryWindow>>,
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
+    mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
 )
 {
     commands.spawn(Camera2d);
@@ -72,6 +75,16 @@ fn setup(
         Mat::Mandelbrot,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
+
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(material_mandelbulb.add(MandelbulbMaterial {
+            resolution: res.clone(), // will be set next frame
+            time : 0.0,
+        })),
+        Mat::Mandelbulb,
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+    ));
 }
 
 fn update_time(
@@ -82,6 +95,7 @@ fn update_time(
     mut state: ResMut<State>,
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
+    mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
 )
 {
     let mut max_time = 0.0;
@@ -139,7 +153,12 @@ fn update_time(
         if mat.time > max_time { max_time = mat.time; }
     }
 
-    if max_time > 2.0 {
+    for (_, mat) in material_mandelbulb.iter_mut() {
+        mat.time += time.delta_secs();
+        if mat.time > max_time { max_time = mat.time; }
+    }
+
+    if max_time > 8.0 {
         let mut rng = rand::rng();
         let next_ind = (0..dmats.count()).choose(&mut rng);
         let next = dmats.iter().next();
@@ -154,6 +173,10 @@ fn update_time(
         }
 
         for (_, mat) in material_qjulia.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_mandelbulb.iter_mut() {
             mat.time = 0.0;
         }
     }
@@ -182,6 +205,18 @@ struct QuatJuliaMaterial {
 impl Material2d for QuatJuliaMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/qjulia_shader.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct MandelbulbMaterial {
+    #[uniform(0)] resolution : Vec2,
+    #[uniform(1)] time : f32,
+}
+
+impl Material2d for MandelbulbMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/mandelbulb_shader.wgsl".into()
     }
 }
 
