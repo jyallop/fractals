@@ -13,8 +13,8 @@ use rand::{distr::Uniform, prelude::*};
 
 #[derive(Component)]
 enum Mat {
-     Mandel,
-     Animate,
+     Mandelbrot,
+     QuatJulia,
 }
 
 fn main()
@@ -22,7 +22,7 @@ fn main()
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(Material2dPlugin::<MandelbrotMaterial>::default())
-        .add_plugins(Material2dPlugin::<AnimateMaterial>::default())
+        .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update_time)
         .run();
@@ -32,8 +32,8 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<PrimaryWindow>>,
-    mut material_man: ResMut<Assets<MandelbrotMaterial>>,
-    mut material_an: ResMut<Assets<AnimateMaterial>>,
+    mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
+    mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
 )
 {
     commands.spawn(Camera2d);
@@ -53,23 +53,23 @@ fn setup(
     });
     commands.spawn((
         Mesh2d(mesh.clone()),
-        MeshMaterial2d(material_an.add(AnimateMaterial {
+        MeshMaterial2d(material_qjulia.add(QuatJuliaMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
             mu: Vec4::ZERO,
             col: Vec3::ZERO,
         })),
-        Mat::Mandel,
+        Mat::QuatJulia,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 
     commands.spawn((
         Mesh2d(mesh.clone()),
-        MeshMaterial2d(material_man.add(MandelbrotMaterial {
+        MeshMaterial2d(material_mandelbrot.add(MandelbrotMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
         })),
-        Mat::Mandel,
+        Mat::Mandelbrot,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 }
@@ -80,12 +80,12 @@ fn update_time(
     dmats: Query<(Entity, &Mat), With<Disabled>>,
     emats: Query<(Entity, &Mat), Without<Disabled>>,
     mut state: ResMut<State>,
-    mut material_man: ResMut<Assets<MandelbrotMaterial>>,
-    mut material_an: ResMut<Assets<AnimateMaterial>>,
+    mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
+    mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
 )
 {
     let mut max_time = 0.0;
-    for (_, mat) in material_an.iter_mut() {
+    for (_, mat) in material_qjulia.iter_mut() {
         mat.time += time.delta_secs();
         max_time = mat.time;
         let dt : f32 = time.delta_secs();
@@ -134,7 +134,7 @@ fn update_time(
         mat.col = col_c;
     }
 
-    for (_, mat) in material_man.iter_mut() {
+    for (_, mat) in material_mandelbrot.iter_mut() {
         mat.time += time.delta_secs();
         if mat.time > max_time { max_time = mat.time; }
     }
@@ -149,16 +149,14 @@ fn update_time(
             commands.entity(enabled).insert(Disabled);
         }
         next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
-        for (_, mat) in material_man.iter_mut() {
+        for (_, mat) in material_mandelbrot.iter_mut() {
             mat.time = 0.0;
         }
 
-        for (_, mat) in material_an.iter_mut() {
+        for (_, mat) in material_qjulia.iter_mut() {
             mat.time = 0.0;
         }
-
     }
-
 }
 
 #[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
@@ -174,14 +172,14 @@ impl Material2d for MandelbrotMaterial {
 }
 
 #[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
-struct AnimateMaterial {
+struct QuatJuliaMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
     #[uniform(2)] mu : Vec4,
     #[uniform(3)] col : Vec3,
 }
 
-impl Material2d for AnimateMaterial {
+impl Material2d for QuatJuliaMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/qjulia_shader.wgsl".into()
     }
