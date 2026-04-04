@@ -17,7 +17,6 @@ alias v4 = vec4f;
 @group(2) @binding(0) var<uniform> resolution: v2;
 @group(2) @binding(1) var<uniform> time: f32;
 
-
 @fragment
 fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 {
@@ -25,14 +24,15 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 
 	let t = time * 0.4;
 
-	let ro = v3(4.0 * sin(t), 2.5, 4.0 * cos(t));
+	let ro = v3(4.0 * sin(t), 7.0, 10.0 * cos(t));
+	/* let ro = v3(4.0, 3.0, 4.0); */
 	let targ = v3(0.0);
 
 	let forward = normalize(targ - ro);
 	let right = normalize(cross(v3(0.0, 1.0, 0.0), forward));
 	let up = cross(forward, right);
 
-	let focal_length = 1.0;
+	let focal_length = 1.5;
 	let rd = normalize(uv.x * right + uv.y * up + focal_length * forward);
 
 	let dist = raymarch(ro, rd);
@@ -42,6 +42,10 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 	{
 		let p = ro + dist * rd;
 		col = shade(p, rd);
+	}
+	else
+	{
+		col = v3(0.02, 0.02, 0.05) + 0.3 * v3(uv.y);
 	}
 
 	return v4(col, 1.0);
@@ -55,48 +59,33 @@ fn box_sdf(p : v3, b : v3) -> f32
 
 fn sponge_sdf(p : v3) -> f32
 {
-	var d = box_sdf(p, v3(1.0, 1.0, 1.0));
-	var scale = 1.0;
-	var P = p;
+    var d = box_sdf(p, vec3(1.2));
+    var s = 1.0;
 
-	for (var i = 0; i < 5; i++)
+    for (var i = 0; i < 5; i++)
 	{
-		P = abs(P);
+        var a = mod_v3(p * s + 1.0, 2.0) - 1.0;
+        s *= 3.0;
 
-		if (P.x < P.y)
-		{
-			let tmp = P;
-			P.x = tmp.y;
-			P.y = tmp.x;
-		}
-		if (P.x < P.z)
-		{
-			let tmp = P;
-			P.x = tmp.z;
-			P.z = tmp.x;
-		}
-		if (P.y < P.z)
-		{
-			let tmp = P;
-			P.y = tmp.z;
-			P.z = tmp.y;
-		}
+        var r = abs(1.0 - 3.0 * abs(a));
 
-		P = P * 3.0 - 2.0;
+        var da = max(r.x, r.y);
+        var db = max(r.y, r.z);
+        var dc = max(r.z, r.x);
 
-		var c = (min(max(P.x, P.y), min(max(P.y, P.z), max(P.z, P.x))) - 1.0) / scale;
+        var c = (min(da, min(db, dc)) - 1.0) / s;
 
-        d = max(d, -c);
+        d = max(d, c);
+    }
 
-        scale *= 3.0;
-	}
-
-	return d;
+    return d;
 }
 
 fn map(p : v3) -> f32
 {
-	return sponge_sdf(p);
+	var P = p / 2.0;
+	var d = sponge_sdf(P);
+	return d * 2.0;
 }
 
 fn get_normal(p : v3) -> v3
@@ -119,7 +108,7 @@ fn raymarch(ro : v3, rd : v3) -> f32
 		var p = ro + t * rd;
 		var d = map(p);
 
-		if (d < 0.001)
+		if (d < 0.002)
 		{
 			return t;
 		}
@@ -128,6 +117,8 @@ fn raymarch(ro : v3, rd : v3) -> f32
 		{
 			break;
 		}
+
+		t += 0.8 * d;
 	}
 
 	return -1.0;
@@ -145,5 +136,10 @@ fn shade(p : v3, rd : v3) -> v3
 	let diffuse = max(dot(n, l), 0.0);
 
 	return (diffuse + ambient) * base_color;
+}
+
+fn mod_v3(x : v3, y : f32) -> v3
+{
+	return x - y * floor(x / y);
 }
 
