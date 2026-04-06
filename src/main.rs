@@ -17,6 +17,7 @@ enum Mat {
      QuatJulia,
      Mandelbulb,
      Sponge,
+     Mandelbox,
 }
 
 fn main()
@@ -27,6 +28,7 @@ fn main()
         .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
         .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
         .add_plugins(Material2dPlugin::<MengerSpongeMaterial>::default())
+        .add_plugins(Material2dPlugin::<MandelboxMaterial>::default())
         .add_systems(Startup, setup)
         .add_systems(Update, update_time)
         .run();
@@ -40,6 +42,7 @@ fn setup(
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
+    mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
 )
 {
     commands.spawn(Camera2d);
@@ -98,6 +101,16 @@ fn setup(
         Mat::Sponge,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
+
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(material_mandelbox.add(MandelboxMaterial {
+            resolution: res.clone(), // will be set next frame
+            time : 0.0,
+        })),
+        Mat::Mandelbox,
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+    ));
 }
 
 fn update_time(
@@ -110,6 +123,7 @@ fn update_time(
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
+    mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
 )
 {
     let mut max_time = 0.0;
@@ -177,6 +191,11 @@ fn update_time(
         if mat.time > max_time { max_time = mat.time; }
     }
 
+    for (_, mat) in material_mandelbox.iter_mut() {
+        mat.time += time.delta_secs();
+        if mat.time > max_time { max_time = mat.time; }
+    }
+
     if max_time > 8.0 {
         let mut rng = rand::rng();
         let next_ind = (0..dmats.count()).choose(&mut rng);
@@ -200,6 +219,10 @@ fn update_time(
         }
 
         for (_, mat) in material_sponge.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_mandelbox.iter_mut() {
             mat.time = 0.0;
         }
     }
@@ -252,6 +275,18 @@ struct MengerSpongeMaterial {
 impl Material2d for MengerSpongeMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/sponge_shader.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct MandelboxMaterial {
+    #[uniform(0)] resolution : Vec2,
+    #[uniform(1)] time : f32,
+}
+
+impl Material2d for MandelboxMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/mandelbox_shader.wgsl".into()
     }
 }
 
