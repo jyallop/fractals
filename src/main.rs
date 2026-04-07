@@ -1,23 +1,26 @@
 #![allow(nonstandard_style)]
 
-use bevy::prelude::*;
-use bevy::sprite_render::{Material2d, Material2dPlugin, MeshMaterial2d};
+use bevy::prelude::{*, ops::cos};
+use bevy::sprite_render::{Material2d, AlphaMode2d, Material2dPlugin, MeshMaterial2d};
 use bevy::mesh::{Mesh, Mesh2d};
 use bevy::render::render_resource::*;
 use bevy::math::primitives::Rectangle;
 use bevy::shader::ShaderRef;
-use bevy::window::Window;
-use bevy::window::PrimaryWindow;
+use bevy::window::{Window, PrimaryWindow};
 use bevy::ecs::entity_disabling::Disabled;
 use rand::{distr::Uniform, prelude::*};
+use std::f32::consts::PI;
 
 #[derive(Component)]
-enum Mat {
-     Mandelbrot,
-     QuatJulia,
-     Mandelbulb,
-     Sponge,
-}
+struct Mat;
+
+#[derive(Component)]
+struct Fader;
+
+#[derive(Component)]
+struct Data;
+
+static CYCLE_TIME : f32 = 10.0;
 
 fn main()
 {
@@ -27,8 +30,10 @@ fn main()
         .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
         .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
         .add_plugins(Material2dPlugin::<MengerSpongeMaterial>::default())
+        .add_plugins(Material2dPlugin::<IfsMaterial>::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, update_time)
+        .add_systems(Update, (update_time, update_state, fader, update_text))
+        //.add_systems(Update, (update_time, update_state))
         .run();
 }
 
@@ -37,9 +42,11 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
-    mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
+    mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
+    mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
+    mut materials: ResMut<Assets<ColorMaterial>>
 )
 {
     commands.spawn(Camera2d);
@@ -56,16 +63,46 @@ fn setup(
         col_a : Vec3::new(0.24, 0.45, 1.0),
         col_b : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
+        time : 0.0,
     });
+
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(
+            materials.add(ColorMaterial {
+                color: Color::srgba(0.0, 0.0, 0.0, 1.0),
+                alpha_mode: AlphaMode2d::Blend, // Required for transparency!
+                ..default()
+            })
+        ),
+        Fader,
+        Transform {
+            scale: Vec3::new(window.physical_width() as f32, window.physical_height() as f32, 0.0),
+            translation: Vec3::new(0.0, 0.0, 2.0),
+            ..default()
+        }
+    ));
+    commands.spawn((
+        Text2d::new("Hello!"),
+        TextFont {
+            font_size: 124.0,
+            ..default()
+        },
+        Data,
+        Fader,
+        TextColor(Color::WHITE),
+        Transform::from_xyz(0.0, 0.0, 23.0), // Z offset so text renders above mesh
+    ));
+
     commands.spawn((
         Mesh2d(mesh.clone()),
         MeshMaterial2d(material_qjulia.add(QuatJuliaMaterial {
             resolution: res.clone(), // will be set next frame
-            time : 0.0,
+            time: 0.0,
             mu: Vec4::ZERO,
             col: Vec3::ZERO,
         })),
-        Mat::QuatJulia,
+        Mat,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 
@@ -73,9 +110,19 @@ fn setup(
         Mesh2d(mesh.clone()),
         MeshMaterial2d(material_mandelbrot.add(MandelbrotMaterial {
             resolution: res.clone(), // will be set next frame
+            time: 0.0,
+        })),
+        Mat,
+        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+    ));
+
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(material_ifs.add(IfsMaterial {
+            resolution: res.clone(), // will be set next frame
             time : 0.0,
         })),
-        Mat::Mandelbrot,
+        Mat,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 
@@ -85,7 +132,7 @@ fn setup(
             resolution: res.clone(), // will be set next frame
             time : 0.0,
         })),
-        Mat::Mandelbulb,
+        Mat,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
 
@@ -95,9 +142,70 @@ fn setup(
             resolution: res.clone(), // will be set next frame
             time : 0.0,
         })),
-        Mat::Sponge,
+        Mat,
         Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
     ));
+}
+
+fn update_state(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut state: ResMut<State>) {
+
+    let dt : f32 = time.delta_secs();
+    state.t += dt;
+
+    if state.t >= 1.0
+    {
+        state.t = 0.0;
+        let mut g = rand::rng();
+        let mut rng = Uniform::new_inclusive(0.0, 1.0).unwrap().sample_iter(&mut g);
+
+        state.mu_a[0] = state.mu_b[0];
+        state.mu_a[1] = state.mu_b[1];
+        state.mu_a[2] = state.mu_b[2];
+        state.mu_a[3] = state.mu_b[3];
+
+        state.mu_b[0] = rng.next().unwrap();
+        state.mu_b[1] = rng.next().unwrap();
+        state.mu_b[2] = rng.next().unwrap();
+        state.mu_b[3] = rng.next().unwrap();
+
+        state.col_a[0] = state.col_b[0];
+        state.col_a[1] = state.col_b[1];
+        state.col_a[2] = state.col_b[2];
+
+        state.col_b[0] = rng.next().unwrap();
+        state.col_b[1] = rng.next().unwrap();
+        state.col_b[2] = rng.next().unwrap();
+    }
+
+}
+
+fn update_text(
+    state: ResMut<State>,
+    mut query: Query<&mut Text2d, With<Data>>,
+) {
+    for mut span in &mut query {
+        **span = format!("{} {} {} {}", state.mu_a[0], state.mu_a[1], state.mu_a[2], state.mu_b[0]);
+    }
+}
+fn fader(
+    time: Res<Time>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    query: Query<&MeshMaterial2d<ColorMaterial>, With<Fader>>,
+    mut text_query: Query<&mut TextColor, With<Fader>>,
+    mut state: ResMut<State>,
+) {
+    let alpha = 0.5 * (cos(2.0 * PI * time.elapsed_secs() / CYCLE_TIME) + 1.0);
+    for handle in &query {
+        if let Some(material) = materials.get_mut(&handle.0) {
+            material.color.set_alpha(alpha);
+        }
+    }
+    for mut text_color in &mut text_query {
+        text_color.0.set_alpha(alpha);
+    }
 }
 
 fn update_time(
@@ -109,45 +217,17 @@ fn update_time(
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
+    mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
 )
 {
-    let mut max_time = 0.0;
+    state.time += time.delta_secs();
     for (_, mat) in material_qjulia.iter_mut() {
         mat.time += time.delta_secs();
-        max_time = mat.time;
-        let dt : f32 = time.delta_secs();
 
         let mut mu_c : Vec4 = Vec4::new(-0.278, -0.479, -0.231, 0.235);
 
         let mut col_c : Vec3 = Vec3::new(0.24, 0.45, 1.0);
-
-        state.t += dt;
-
-        if state.t >= 1.0
-        {
-            state.t = 0.0;
-            let mut g = rand::rng();
-            let mut rng = Uniform::new_inclusive(0.0, 1.0).unwrap().sample_iter(&mut g);
-
-            state.mu_a[0] = state.mu_b[0];
-            state.mu_a[1] = state.mu_b[1];
-            state.mu_a[2] = state.mu_b[2];
-            state.mu_a[3] = state.mu_b[3];
-
-            state.mu_b[0] = rng.next().unwrap();
-            state.mu_b[1] = rng.next().unwrap();
-            state.mu_b[2] = rng.next().unwrap();
-            state.mu_b[3] = rng.next().unwrap();
-
-            state.col_a[0] = state.col_b[0];
-            state.col_a[1] = state.col_b[1];
-            state.col_a[2] = state.col_b[2];
-
-            state.col_b[0] = rng.next().unwrap();
-            state.col_b[1] = rng.next().unwrap();
-            state.col_b[2] = rng.next().unwrap();
-        }
 
         mu_c[0] = (1.0 - state.t) * state.mu_a[0] + state.t * state.mu_b[0];
         mu_c[1] = (1.0 - state.t) * state.mu_a[1] + state.t * state.mu_b[1];
@@ -160,38 +240,53 @@ fn update_time(
 
         mat.mu = mu_c;
         mat.col = col_c;
+        mat.resolution.x -= 10.0;
+        mat.resolution.y -= 10.0;
     }
 
     for (_, mat) in material_mandelbrot.iter_mut() {
         mat.time += time.delta_secs();
-        if mat.time > max_time { max_time = mat.time; }
     }
 
     for (_, mat) in material_mandelbulb.iter_mut() {
         mat.time += time.delta_secs();
-        if mat.time > max_time { max_time = mat.time; }
     }
 
     for (_, mat) in material_sponge.iter_mut() {
         mat.time += time.delta_secs();
-        if mat.time > max_time { max_time = mat.time; }
     }
 
-    if max_time > 8.0 {
-        let mut rng = rand::rng();
-        let next_ind = (0..dmats.count()).choose(&mut rng);
-        let next = dmats.iter().next();
+    for (_, mat) in material_ifs.iter_mut() {
+        mat.time += time.delta_secs();
+    }
 
-        for (enabled, _) in emats {
+    if state.time > CYCLE_TIME {
+        let mut rng = rand::rng();
+        let next_ind = if dmats.is_empty() { Some(0) } else { (0..dmats.count() - 1).choose(&mut rng) };
+        println!("next: {:#?}", next_ind);
+        let mut next = dmats.iter().next();
+        for (i, val) in dmats.iter().enumerate() {
+            if i == next_ind.unwrap() {
+                next = Some(val);
+            }
+        }
+        let enab = if dmats.is_empty() { emats.iter().skip(1) } else { emats.iter().skip(0) };
+        for (enabled, _) in enab {
             println!("Enabled: {:#?}", enabled);
             commands.entity(enabled).insert(Disabled);
         }
         next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
+        state.time = 0.0;
+        /*
         for (_, mat) in material_mandelbrot.iter_mut() {
             mat.time = 0.0;
         }
 
         for (_, mat) in material_qjulia.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_ifs.iter_mut() {
             mat.time = 0.0;
         }
 
@@ -201,7 +296,8 @@ fn update_time(
 
         for (_, mat) in material_sponge.iter_mut() {
             mat.time = 0.0;
-        }
+    }
+        */
     }
 }
 
@@ -255,6 +351,18 @@ impl Material2d for MengerSpongeMaterial {
     }
 }
 
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct IfsMaterial {
+    #[uniform(0)] resolution : Vec2,
+    #[uniform(1)] time : f32,
+}
+
+impl Material2d for IfsMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/ifs_shader.wgsl".into()
+    }
+}
+
 #[derive(Resource)]
 struct State {
     mu_a : Vec4,
@@ -262,4 +370,5 @@ struct State {
     col_a : Vec3,
     col_b : Vec3,
     t : f32,
+    time : f32
 }
