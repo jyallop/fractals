@@ -10,6 +10,9 @@ use bevy::window::{Window, PrimaryWindow};
 use bevy::ecs::entity_disabling::Disabled;
 use rand::{distr::Uniform, prelude::*};
 use std::f32::consts::PI;
+use bevy::window::WindowMode;
+use std::cmp::min;
+use bevy::text::{FontSmoothing, LineBreak, TextBounds};
 
 #[derive(Component)]
 struct Mat;
@@ -21,11 +24,20 @@ struct Fader;
 struct Data;
 
 static CYCLE_TIME : f32 = 10.0;
+static TEXT_ROWS : f32 = 10.0;
 
 fn main()
 {
     App::new()
-        .add_plugins(DefaultPlugins)
+//        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+//                mode: WindowMode::Fullscreen(MonitorSelection::Index(0), VideoModeSelection::Current),
+                ..default()
+            }),
+            ..default()
+        }))
         .add_plugins(Material2dPlugin::<MandelbrotMaterial>::default())
         .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
         .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
@@ -51,10 +63,12 @@ fn setup(
 {
     commands.spawn(Camera2d);
     let window = windows.single().unwrap();
+    let height = window.physical_height() as f32;
+    let width = window.physical_width() as f32;
 
     let res = Vec2::new(
-        window.physical_width() as f32,
-        window.physical_height() as f32,
+        width,
+        height
     );
     let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
     commands.insert_resource(State {
@@ -64,8 +78,25 @@ fn setup(
         col_b : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
         time : 0.0,
+        data : String::new(),
     });
 
+    let text_box =
+        (Text2d::new("Hello!"),
+        TextFont {
+            font_size: height / TEXT_ROWS,
+            ..default()
+        },
+        Data,
+        Fader,
+        TextColor(Color::WHITE),
+         TextLayout::new(Justify::Left, LineBreak::AnyCharacter),
+         // Wrap text in the rectangle
+         TextBounds::from(Vec2::new(width, height)),
+         Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
+        );
+
+    commands.spawn(text_box);
     commands.spawn((
         Mesh2d(mesh.clone()),
         MeshMaterial2d(
@@ -80,18 +111,7 @@ fn setup(
             scale: Vec3::new(window.physical_width() as f32, window.physical_height() as f32, 0.0),
             translation: Vec3::new(0.0, 0.0, 2.0),
             ..default()
-        }
-    ));
-    commands.spawn((
-        Text2d::new("Hello!"),
-        TextFont {
-            font_size: 124.0,
-            ..default()
         },
-        Data,
-        Fader,
-        TextColor(Color::WHITE),
-        Transform::from_xyz(0.0, 0.0, 23.0), // Z offset so text renders above mesh
     ));
 
     commands.spawn((
@@ -103,7 +123,7 @@ fn setup(
             col: Vec3::ZERO,
         })),
         Mat,
-        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
     ));
 
     commands.spawn((
@@ -113,7 +133,7 @@ fn setup(
             time: 0.0,
         })),
         Mat,
-        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
     ));
 
     commands.spawn((
@@ -123,7 +143,7 @@ fn setup(
             time : 0.0,
         })),
         Mat,
-        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
     ));
 
     commands.spawn((
@@ -133,7 +153,7 @@ fn setup(
             time : 0.0,
         })),
         Mat,
-        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
     ));
 
     commands.spawn((
@@ -143,7 +163,7 @@ fn setup(
             time : 0.0,
         })),
         Mat,
-        Transform::from_scale(Vec3::new(2000.0, 2000.0, 1.0)), // big enough
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
     ));
 }
 
@@ -178,16 +198,26 @@ fn update_state(
         state.col_b[0] = rng.next().unwrap();
         state.col_b[1] = rng.next().unwrap();
         state.col_b[2] = rng.next().unwrap();
+
+        for i in 0..2 {
+            let addition = &(state.col_b[i].to_string());
+            state.data += &("|".to_owned() + addition);
+            let addition_two = &(state.col_a[i].to_string());
+            state.data += &("|".to_owned() + addition_two);
+        }
     }
 
 }
 
 fn update_text(
-    state: ResMut<State>,
+    mut state: ResMut<State>,
     mut query: Query<&mut Text2d, With<Data>>,
 ) {
     for mut span in &mut query {
-        **span = format!("{} {} {} {}", state.mu_a[0], state.mu_a[1], state.mu_a[2], state.mu_b[0]);
+        **span = state.data.clone();
+    }
+    if state.data.len() > 0 {
+        state.data = state.data[1..].to_string();
     }
 }
 fn fader(
@@ -370,5 +400,6 @@ struct State {
     col_a : Vec3,
     col_b : Vec3,
     t : f32,
-    time : f32
+    time : f32,
+    data : String,
 }
