@@ -22,7 +22,7 @@ struct Fader;
 #[derive(Component)]
 struct Data;
 
-static CYCLE_TIME : f32 = 10.0;
+static CYCLE_TIME : f32 = 15.0;
 static TEXT_ROWS : f32 = 10.0;
 
 fn main()
@@ -39,10 +39,8 @@ fn main()
         .add_plugins(Material2dPlugin::<QuatJuliaMaterial>::default())
         .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
         .add_plugins(Material2dPlugin::<MengerSpongeMaterial>::default())
-        .add_plugins(Material2dPlugin::<IfsMaterial>::default())
         .add_plugins(Material2dPlugin::<MandelboxMaterial>::default())
         .add_systems(Startup, setup)
-//        .add_systems(Update, (update_time, fader, update_text))
         .add_systems(Update, (update_time, change_fractal, update_state, fader, update_text))
         .run();
 }
@@ -54,10 +52,9 @@ fn setup(
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
-    mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
+    mut materials: ResMut<Assets<ColorMaterial>>
 )
 {
     commands.spawn(Camera2d);
@@ -75,13 +72,18 @@ fn setup(
         mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
         col_a : Vec3::new(0.24, 0.45, 1.0),
         col_b : Vec3::new(0.24, 0.45, 1.0),
+        s_a : 1.0,
+        s_b : 1.0,
+        h_a : 10.0,
+        h_b : 10.0,
+        base_color : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
         time : 0.0,
         data : String::new(),
     });
 
     commands.spawn((
-        Text2d::new("Hello!"),
+        Text2d::new(""),
         TextFont {
             font_size: height / TEXT_ROWS,
             ..default()
@@ -99,8 +101,8 @@ fn setup(
         Mesh2d(mesh.clone()),
         MeshMaterial2d(
             materials.add(ColorMaterial {
-                color: Color::srgba(0.0, 0.0, 0.0, 1.0),
-                alpha_mode: AlphaMode2d::Blend, // Required for transparency!
+                color: Color::srgba(0.0, 0.0, 0.0, 0.0),
+                alpha_mode: AlphaMode2d::Blend,
                 ..default()
             })
         ),
@@ -129,16 +131,8 @@ fn setup(
         MeshMaterial2d(material_mandelbrot.add(MandelbrotMaterial {
             resolution: res.clone(), // will be set next frame
             time: 0.0,
-        })),
-        Mat,
-        Transform::from_scale(Vec3::new(width, height, 1.0)),
-    ));
-
-    commands.spawn((
-        Mesh2d(mesh.clone()),
-        MeshMaterial2d(material_ifs.add(IfsMaterial {
-            resolution: res.clone(), // will be set next frame
-            time : 0.0,
+            base_color: Vec3::ZERO,
+            h_factor: 10.0,
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -149,6 +143,7 @@ fn setup(
         MeshMaterial2d(material_mandelbulb.add(MandelbulbMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
+            base_color : Vec3::new(0.0, 0.0, 0.0),
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -159,6 +154,8 @@ fn setup(
         MeshMaterial2d(material_sponge.add(MengerSpongeMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
+            base_color : Vec3::new(0.0, 0.0, 0.0),
+            sponge_s : 1.0,
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -169,6 +166,7 @@ fn setup(
         MeshMaterial2d(material_mandelbox.add(MandelboxMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
+            base_color : Vec3::new(0.0, 0.0, 0.0),
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -193,18 +191,25 @@ fn update_state(
         state.mu_a[2] = state.mu_b[2];
         state.mu_a[3] = state.mu_b[3];
 
-        state.mu_b[0] = rng.next().unwrap();
-        state.mu_b[1] = rng.next().unwrap();
-        state.mu_b[2] = rng.next().unwrap();
-        state.mu_b[3] = rng.next().unwrap();
+        state.mu_b[0] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[1] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[2] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[3] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
 
         state.col_a[0] = state.col_b[0];
         state.col_a[1] = state.col_b[1];
         state.col_a[2] = state.col_b[2];
 
-        state.col_b[0] = rng.next().unwrap();
-        state.col_b[1] = rng.next().unwrap();
-        state.col_b[2] = rng.next().unwrap();
+        state.col_b[0] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
+        state.col_b[1] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
+        state.col_b[2] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
+
+        state.s_a = state.s_b;
+
+        state.s_b = 2.0 * rng.next().unwrap() + 1.0; // [1, 3)
+
+        state.h_a = state.h_b;
+        state.h_b = 90.0 * rng.next().unwrap() + 10.0; // [10, 100)
 
         for i in 0..2 {
             let addition = &(state.col_b[i].to_string());
@@ -214,6 +219,9 @@ fn update_state(
         }
     }
 
+    state.base_color[0] = (1.0 - state.t) * state.col_a[0] + state.t * state.col_b[0];
+    state.base_color[1] = (1.0 - state.t) * state.col_a[1] + state.t * state.col_b[1];
+    state.base_color[2] = (1.0 - state.t) * state.col_a[2] + state.t * state.col_b[2];
 }
 
 fn update_text(
@@ -241,7 +249,21 @@ fn fader(
         }
     }
     for mut text_color in &mut text_query {
-        text_color.0.set_alpha(alpha);
+        let dt = time.delta_secs();
+        let t = time.elapsed_secs();
+        let state_time = CYCLE_TIME * ((t / CYCLE_TIME).floor());
+        let mut new_alpha = text_color.0.alpha();
+        let window = 0.2;
+
+        if window * CYCLE_TIME > t - state_time {
+            new_alpha -= dt / (window * CYCLE_TIME);
+            if new_alpha < 0.0 { new_alpha = 0.0 };
+        }
+        if t - state_time > (1.0 - window) * CYCLE_TIME {
+            new_alpha += dt / (window * CYCLE_TIME);
+            if new_alpha > 1.0 { new_alpha = 1.0 };
+        }
+        text_color.0.set_alpha(new_alpha);
     }
 }
 
@@ -268,27 +290,6 @@ fn change_fractal(
         }
         next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
         state.time = 0.0;
-        /*
-        for (_, mat) in material_mandelbrot.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_qjulia.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_ifs.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_mandelbulb.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_sponge.iter_mut() {
-        ma.time = 0.0;
-    }
-        */
     }
 }
 
@@ -298,7 +299,6 @@ fn update_time(
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
-    mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
     mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
 )
@@ -309,37 +309,35 @@ fn update_time(
 
         let mut mu_c : Vec4 = Vec4::new(-0.278, -0.479, -0.231, 0.235);
 
-        let mut col_c : Vec3 = Vec3::new(0.24, 0.45, 1.0);
-
         mu_c[0] = (1.0 - state.t) * state.mu_a[0] + state.t * state.mu_b[0];
         mu_c[1] = (1.0 - state.t) * state.mu_a[1] + state.t * state.mu_b[1];
         mu_c[2] = (1.0 - state.t) * state.mu_a[2] + state.t * state.mu_b[2];
         mu_c[3] = (1.0 - state.t) * state.mu_a[3] + state.t * state.mu_b[3];
 
-        col_c[0] = (1.0 - state.t) * state.col_a[0] + state.t * state.col_b[0];
-        col_c[1] = (1.0 - state.t) * state.col_a[1] + state.t * state.col_b[1];
-        col_c[2] = (1.0 - state.t) * state.col_a[2] + state.t * state.col_b[2];
-
         mat.mu = mu_c;
-        mat.col = col_c;
-        mat.resolution.x -= 10.0;
-        mat.resolution.y -= 10.0;
+        mat.col = state.base_color;
     }
 
     for (_, mat) in material_mandelbrot.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
+        mat.h_factor = (1.0 - state.t) * state.h_a + state.t * state.h_b;
     }
 
     for (_, mat) in material_mandelbulb.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
     }
 
     for (_, mat) in material_sponge.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
+        mat.sponge_s = (1.0 - state.t) * state.s_a + state.t * state.s_b;
     }
 
-    for (_, mat) in material_ifs.iter_mut() {
+    for (_, mat) in material_mandelbox.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
     }
 
     for (_, mat) in material_mandelbox.iter_mut() {
@@ -351,6 +349,8 @@ fn update_time(
 struct MandelbrotMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
+    #[uniform(3)] h_factor : f32,
 }
 
 impl Material2d for MandelbrotMaterial {
@@ -377,6 +377,7 @@ impl Material2d for QuatJuliaMaterial {
 struct MandelbulbMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
 }
 
 impl Material2d for MandelbulbMaterial {
@@ -389,6 +390,8 @@ impl Material2d for MandelbulbMaterial {
 struct MengerSpongeMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
+    #[uniform(3)] sponge_s : f32,
 }
 
 impl Material2d for MengerSpongeMaterial {
@@ -398,26 +401,28 @@ impl Material2d for MengerSpongeMaterial {
 }
 
 #[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
-struct IfsMaterial {
-    #[uniform(0)] resolution : Vec2,
-    #[uniform(1)] time : f32,
-}
-
-impl Material2d for IfsMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/ifs_shader.wgsl".into()
-    }
-}
-
-#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
 struct MandelboxMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
 }
 
 impl Material2d for MandelboxMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/mandelbox_shader.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct IfsMaterial {
+    #[uniform(0)] resolution : Vec2,
+    #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
+}
+
+impl Material2d for IfsMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/ifs_shader.wgsl".into()
     }
 }
 
@@ -427,6 +432,11 @@ struct State {
     mu_b : Vec4,
     col_a : Vec3,
     col_b : Vec3,
+    s_a : f32,
+    s_b : f32,
+    h_a : f32,
+    h_b : f32,
+    base_color : Vec3,
     t : f32,
     time : f32,
     data : String,

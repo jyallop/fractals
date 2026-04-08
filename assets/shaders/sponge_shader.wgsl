@@ -16,6 +16,8 @@ alias v4 = vec4f;
 
 @group(2) @binding(0) var<uniform> resolution: v2;
 @group(2) @binding(1) var<uniform> time: f32;
+@group(2) @binding(2) var<uniform> base_color: v3;
+@group(2) @binding(3) var<uniform> sponge_s: f32;
 
 @fragment
 fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
@@ -60,7 +62,7 @@ fn box_sdf(p : v3, b : v3) -> f32
 fn sponge_sdf(p : v3) -> f32
 {
     var d = box_sdf(p, vec3(1.2));
-    var s = 1.0;
+    var s = sponge_s;
 
     for (var i = 0; i < 5; i++)
 	{
@@ -90,7 +92,7 @@ fn map(p : v3) -> f32
 
 fn get_normal(p : v3) -> v3
 {
-	let eps = 0.001;
+	let eps = 0.01;
 
     return normalize(v3(
         map(p + v3(eps, 0.0, 0.0)) - map(p - v3(eps, 0.0, 0.0)),
@@ -131,7 +133,6 @@ fn shade(p : v3, rd : v3) -> v3
 	let n = get_normal(p);
 	let l = normalize(light_pos - p);
 
-	let base_color = v3(0.8, 0.9, 1.0);
 	let ambient = 0.2;
 	let diffuse = max(dot(n, l), 0.0);
 
