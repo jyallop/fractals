@@ -1,6 +1,23 @@
-@group(2) @binding(0) var<uniform> resolution: vec2f;
-@group(2) @binding(1) var<uniform> time: f32;
+alias v2i = vec2i;
+alias v3i = vec3i;
+alias v4i = vec4i;
 
+alias v2u = vec2u;
+alias v3u = vec3u;
+alias v4u = vec4u;
+
+alias v2f = vec2f;
+alias v3f = vec3f;
+alias v4f = vec4f;
+
+alias v2 = vec2f;
+alias v3 = vec3f;
+alias v4 = vec4f;
+
+@group(2) @binding(0) var<uniform> resolution: v2;
+@group(2) @binding(1) var<uniform> time: f32;
+@group(2) @binding(2) var<uniform> base_color: v3;
+@group(2) @binding(3) var<uniform> h_factor: f32;
 
 fn cadd (a : vec2f, s : f32) -> vec2f
 {
@@ -69,13 +86,12 @@ fn fragment(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f
 	let c = vec2f(0.2,0.2) +
              0.30*vec2f( cos(0.31*t), sin(0.37*t) ) - 
 		     0.15*vec2f( sin(1.17*t), cos(2.31*t) );
-	
 
 	// iterate		
 	var dz = vec2f( 1.0, 0.0 );
 	var z = P;
 	var g = 1e10;
-	for (var i : i32 =0; i<100; i++ )
+	for (var i : i32 = 0; i < 100; i++ )
 	{
 		if (dot(z,z)>10000.0)
 		{
@@ -94,11 +110,11 @@ fn fragment(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f
     // distance estimator
 	var h = 0.5*log(dot(z,z))*sqrt( dot(z,z)/dot(dz,dz) );
 	
-	h = clamp( h*250.0, 0.0, 1.0 );
+	h = clamp(h * h_factor, 0.0, 1.0 );
 	
-	
-	var col = 0.6 + 0.4*cos( log(log(1.0+g))*0.5 + 4.5 + vec3f(0.0,0.5,1.0) );
+	var col = 0.6 + 0.4*cos( log(log(1.0+g))*0.5 + 4.5 + base_color );
 	col *= h;
+	col = v3(1.0) - col;
 
     return vec4f(col, 1.0);
 }

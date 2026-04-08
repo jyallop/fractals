@@ -78,6 +78,8 @@ fn setup(
         col_b : Vec3::new(0.24, 0.45, 1.0),
         s_a : 1.0,
         s_b : 1.0,
+        h_a : 10.0,
+        h_b : 10.0,
         base_color : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
         time : 0.0,
@@ -134,6 +136,8 @@ fn setup(
         MeshMaterial2d(material_mandelbrot.add(MandelbrotMaterial {
             resolution: res.clone(), // will be set next frame
             time: 0.0,
+            base_color: Vec3::ZERO,
+            h_factor: 10.0,
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -192,22 +196,25 @@ fn update_state(
         state.mu_a[2] = state.mu_b[2];
         state.mu_a[3] = state.mu_b[3];
 
-        state.mu_b[0] = rng.next().unwrap();
-        state.mu_b[1] = rng.next().unwrap();
-        state.mu_b[2] = rng.next().unwrap();
-        state.mu_b[3] = rng.next().unwrap();
+        state.mu_b[0] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[1] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[2] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
+        state.mu_b[3] = 2.0 * rng.next().unwrap() - 1.0; // [-1, 1)
 
         state.col_a[0] = state.col_b[0];
         state.col_a[1] = state.col_b[1];
         state.col_a[2] = state.col_b[2];
 
-        state.col_b[0] = rng.next().unwrap();
-        state.col_b[1] = rng.next().unwrap();
-        state.col_b[2] = rng.next().unwrap();
+        state.col_b[0] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
+        state.col_b[1] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
+        state.col_b[2] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
 
         state.s_a = state.s_b;
 
-        state.s_b = rng.next().unwrap();
+        state.s_b = 2.0 * rng.next().unwrap() + 1.0; // [1, 3)
+
+        state.h_a = state.h_b;
+        state.h_b = 90.0 * rng.next().unwrap() + 10.0; // [10, 100)
 
         for i in 0..2 {
             let addition = &(state.col_b[i].to_string());
@@ -285,6 +292,8 @@ fn update_time(
 
     for (_, mat) in material_mandelbrot.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
+        mat.h_factor = (1.0 - state.t) * state.h_a + state.t * state.h_b;
     }
 
     for (_, mat) in material_mandelbulb.iter_mut() {
@@ -347,6 +356,8 @@ fn update_time(
 struct MandelbrotMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
+    #[uniform(3)] h_factor : f32,
 }
 
 impl Material2d for MandelbrotMaterial {
@@ -416,6 +427,8 @@ struct State {
     col_b : Vec3,
     s_a : f32,
     s_b : f32,
+    h_a : f32,
+    h_b : f32,
     base_color : Vec3,
     t : f32,
     time : f32,
