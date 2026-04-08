@@ -205,8 +205,7 @@ fn update_state(
         state.col_b[2] = 0.8 * rng.next().unwrap() + 0.2; // [0.2, 1.0)
 
         state.s_a = state.s_b;
-
-        state.s_b = 2.0 * rng.next().unwrap() + 1.0; // [1, 3)
+        state.s_b = 3.0 * rng.next().unwrap() + 2.0; // [2, 5)
 
         state.h_a = state.h_b;
         state.h_b = 90.0 * rng.next().unwrap() + 10.0; // [10, 100)
@@ -257,7 +256,7 @@ fn fader(
 
         if window * CYCLE_TIME > t - state_time {
             new_alpha -= dt / (window * CYCLE_TIME);
-            if new_alpha < 0.0 { new_alpha = 0.0 };
+            if new_alpha < 0.005 { new_alpha = 0.005 };
         }
         if t - state_time > (1.0 - window) * CYCLE_TIME {
             new_alpha += dt / (window * CYCLE_TIME);

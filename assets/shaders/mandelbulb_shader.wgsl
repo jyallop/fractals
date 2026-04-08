@@ -130,7 +130,7 @@ fn shade(p : v3) -> v3
     let n = get_normal(p);
     let l = normalize(lightPos - p);
 
-    let diff = max(dot(n, l), 0.0);
+    let diff = abs(dot(n, l));
 
     return base_color * diff;
 }

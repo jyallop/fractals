@@ -26,8 +26,7 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 
 	let t = time * 0.4;
 
-	let ro = v3(4.0 * sin(t), 7.0, 10.0 * cos(t));
-	/* let ro = v3(4.0, 3.0, 4.0); */
+	let ro = v3(4.0 * sin(t), 5.0, 5.0 * cos(t));
 	let targ = v3(0.0);
 
 	let forward = normalize(targ - ro);
@@ -85,9 +84,7 @@ fn sponge_sdf(p : v3) -> f32
 
 fn map(p : v3) -> f32
 {
-	var P = p / 2.0;
-	var d = sponge_sdf(P);
-	return d * 2.0;
+    return sponge_sdf(p);
 }
 
 fn get_normal(p : v3) -> v3

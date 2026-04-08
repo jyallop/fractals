@@ -77,10 +77,8 @@ fn df(z : vec2f, c : vec2f) -> vec2f
 fn fragment(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f
 {
     // Normalize to [0,1]
-    let UV = frag_coord.xy / resolution;
-	var P = 2 * UV - 1.0;
-	P.x *= resolution.x / resolution.y;
-	P = 2.5 * (P + vec2f(0.25, 0.37));
+    let UV = (frag_coord.xy - 0.5 * resolution) / resolution.y;
+    let P = 2.5 * (UV + v2(0.25, 0.37));
 
 	let t = time * 0.3;
 	let c = vec2f(0.2,0.2) +

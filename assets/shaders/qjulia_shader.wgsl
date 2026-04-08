@@ -3,7 +3,7 @@
 @group(2) @binding(2) var<uniform> _mu: vec4f;
 @group(2) @binding(3) var<uniform> _col: vec3f;
 
-const BOUNDING_RADIUS_2 : f32 = 3.0;
+const BOUNDING_RADIUS_2 : f32 = 5.0;
 const ESCAPE_THRESHOLD : f32 = 10.0;
 const DEL : f32 = 1e-4;
 
@@ -200,7 +200,7 @@ fn qjulia(
 	render_shadows : bool,
 	max_iters : u32) -> v4
 {
-	let	bg_color = v4(0.1, 0.1, 0.1, 1.0);
+	let	bg_color = v4(0.0, 0.0, 0.0, 1.0);
 
 	var color = bg_color;
 
