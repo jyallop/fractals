@@ -31,7 +31,7 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) vec4f
 	var size = v2(resolution.x, resolution.y);
 	var scale = min(size.x, size.y);
 	var half = v2(0.5, 0.5);
-	var zoom : f32 = 1.0;
+	var zoom : f32 = 2.0;
 	var position = (frag_coord.xy - half * size) / scale * BOUNDING_RADIUS_2 * (1 / zoom);
 
 	var light = v4(1.5, 0.5, 4.0, 1.0);

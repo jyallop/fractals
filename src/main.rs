@@ -67,6 +67,7 @@ fn setup(
         height
     );
     let mesh = meshes.add(Mesh::from(Rectangle::new(1.0, 1.0)));
+
     commands.insert_resource(State {
         mu_a : Vec4::new(-0.278, -0.479,  0.0,   0.0),
         mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
@@ -77,11 +78,12 @@ fn setup(
         h_a : 10.0,
         h_b : 10.0,
         base_color : Vec3::new(0.24, 0.45, 1.0),
-        t : 0.0,
+        t : CYCLE_TIME - 3.0,
         time : 0.0,
         data : String::new(),
+        ids : vec![0, 0, 1, 2, 3],
+        curr: 0,
     });
-
     commands.spawn((
         Text2d::new(""),
         TextFont {
@@ -237,11 +239,12 @@ fn update_text(
 
 fn fader(
     time: Res<Time>,
+    state: ResMut<State>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     query: Query<&MeshMaterial2d<ColorMaterial>, With<Fader>>,
     mut text_query: Query<&mut TextColor, With<Fader>>,
 ) {
-    let alpha = 0.5 * (cos(2.0 * PI * time.elapsed_secs() / CYCLE_TIME) + 1.0);
+    let alpha = 0.5 * (cos(2.0 * PI * state.time / CYCLE_TIME) + 1.0);
     for handle in &query {
         if let Some(material) = materials.get_mut(&handle.0) {
             material.color.set_alpha(alpha);
@@ -250,15 +253,15 @@ fn fader(
     for mut text_color in &mut text_query {
         let dt = time.delta_secs();
         let t = time.elapsed_secs();
-        let state_time = CYCLE_TIME * ((t / CYCLE_TIME).floor());
+        let state_time = state.time;
         let mut new_alpha = text_color.0.alpha();
-        let window = 0.2;
+        let window = 0.1;
 
-        if window * CYCLE_TIME > t - state_time {
+        if window * CYCLE_TIME > state_time {
             new_alpha -= dt / (window * CYCLE_TIME);
             if new_alpha < 0.005 { new_alpha = 0.005 };
         }
-        if t - state_time > (1.0 - window) * CYCLE_TIME {
+        if state_time > CYCLE_TIME - (window * CYCLE_TIME) {
             new_alpha += dt / (window * CYCLE_TIME);
             if new_alpha > 1.0 { new_alpha = 1.0 };
         }
@@ -273,22 +276,20 @@ fn change_fractal(
     mut state: ResMut<State>,
 ) {
     if state.time > CYCLE_TIME {
-        let mut rng = rand::rng();
-        let next_ind = if dmats.is_empty() { Some(0) } else { (0..dmats.count() - 1).choose(&mut rng) };
-        println!("next: {:#?}", next_ind);
-        let mut next = dmats.iter().next();
+        let next_ind = state.ids[state.curr];
+        let mut next = None;
+        println!("next_ind: {}", next_ind);
         for (i, val) in dmats.iter().enumerate() {
-            if i == next_ind.unwrap() {
+            if i == next_ind {
                 next = Some(val);
             }
         }
-        let enab = if dmats.is_empty() { emats.iter().skip(1) } else { emats.iter().skip(0) };
-        for (enabled, _) in enab {
-            println!("Enabled: {:#?}", enabled);
+        for (enabled, _) in emats {
             commands.entity(enabled).insert(Disabled);
         }
-        next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
+        next.map(|(n, _)| { commands.entity(n).remove::<Disabled>(); });
         state.time = 0.0;
+        state.curr = (state.curr + 1) % state.ids.len();
     }
 }
 
@@ -439,4 +440,6 @@ struct State {
     t : f32,
     time : f32,
     data : String,
+    ids: Vec<usize>,
+    curr: usize,
 }
