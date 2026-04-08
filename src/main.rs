@@ -76,6 +76,7 @@ fn setup(
         mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
         col_a : Vec3::new(0.24, 0.45, 1.0),
         col_b : Vec3::new(0.24, 0.45, 1.0),
+        base_color : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
         time : 0.0,
         data : String::new(),
@@ -207,6 +208,9 @@ fn update_state(
         }
     }
 
+    state.base_color[0] = (1.0 - state.t) * state.col_a[0] + state.t * state.col_b[0];
+    state.base_color[1] = (1.0 - state.t) * state.col_a[1] + state.t * state.col_b[1];
+    state.base_color[2] = (1.0 - state.t) * state.col_a[2] + state.t * state.col_b[2];
 }
 
 fn update_text(
@@ -264,12 +268,8 @@ fn update_time(
         mu_c[2] = (1.0 - state.t) * state.mu_a[2] + state.t * state.mu_b[2];
         mu_c[3] = (1.0 - state.t) * state.mu_a[3] + state.t * state.mu_b[3];
 
-        col_c[0] = (1.0 - state.t) * state.col_a[0] + state.t * state.col_b[0];
-        col_c[1] = (1.0 - state.t) * state.col_a[1] + state.t * state.col_b[1];
-        col_c[2] = (1.0 - state.t) * state.col_a[2] + state.t * state.col_b[2];
-
         mat.mu = mu_c;
-        mat.col = col_c;
+        mat.col = state.base_color;
         mat.resolution.x -= 10.0;
         mat.resolution.y -= 10.0;
     }
@@ -399,6 +399,7 @@ struct State {
     mu_b : Vec4,
     col_a : Vec3,
     col_b : Vec3,
+    base_color : Vec3,
     t : f32,
     time : f32,
     data : String,
