@@ -11,8 +11,7 @@ use bevy::ecs::entity_disabling::Disabled;
 use rand::{distr::Uniform, prelude::*};
 use std::f32::consts::PI;
 use bevy::window::WindowMode;
-use std::cmp::min;
-use bevy::text::{FontSmoothing, LineBreak, TextBounds};
+use bevy::text::{LineBreak, TextBounds};
 
 #[derive(Component)]
 struct Mat;
@@ -29,11 +28,9 @@ static TEXT_ROWS : f32 = 10.0;
 fn main()
 {
     App::new()
-//        .add_plugins(DefaultPlugins)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
-//                mode: WindowMode::Fullscreen(MonitorSelection::Index(0), VideoModeSelection::Current),
                 ..default()
             }),
             ..default()
@@ -44,8 +41,8 @@ fn main()
         .add_plugins(Material2dPlugin::<MengerSpongeMaterial>::default())
         .add_plugins(Material2dPlugin::<IfsMaterial>::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_time, update_state, fader, update_text))
-        //.add_systems(Update, (update_time, update_state))
+//        .add_systems(Update, (update_time, fader, update_text))
+        .add_systems(Update, (update_time, change_fractal, update_state, fader, update_text))
         .run();
 }
 
@@ -81,8 +78,8 @@ fn setup(
         data : String::new(),
     });
 
-    let text_box =
-        (Text2d::new("Hello!"),
+    commands.spawn((
+        Text2d::new("Hello!"),
         TextFont {
             font_size: height / TEXT_ROWS,
             ..default()
@@ -90,13 +87,12 @@ fn setup(
         Data,
         Fader,
         TextColor(Color::WHITE),
-         TextLayout::new(Justify::Left, LineBreak::AnyCharacter),
-         // Wrap text in the rectangle
-         TextBounds::from(Vec2::new(width, height)),
-         Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
-        );
+        TextLayout::new(Justify::Left, LineBreak::AnyCharacter),
+        // Wrap text in the rectangle
+        TextBounds::from(Vec2::new(width, height)),
+        Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
+    ));
 
-    commands.spawn(text_box);
     commands.spawn((
         Mesh2d(mesh.clone()),
         MeshMaterial2d(
@@ -169,7 +165,6 @@ fn setup(
 
 fn update_state(
     time: Res<Time>,
-    mut commands: Commands,
     mut state: ResMut<State>) {
 
     let dt : f32 = time.delta_secs();
@@ -220,12 +215,12 @@ fn update_text(
         state.data = state.data[1..].to_string();
     }
 }
+
 fn fader(
     time: Res<Time>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     query: Query<&MeshMaterial2d<ColorMaterial>, With<Fader>>,
     mut text_query: Query<&mut TextColor, With<Fader>>,
-    mut state: ResMut<State>,
 ) {
     let alpha = 0.5 * (cos(2.0 * PI * time.elapsed_secs() / CYCLE_TIME) + 1.0);
     for handle in &query {
@@ -238,11 +233,55 @@ fn fader(
     }
 }
 
-fn update_time(
-    time: Res<Time>,
+fn change_fractal(
     mut commands: Commands,
     dmats: Query<(Entity, &Mat), With<Disabled>>,
     emats: Query<(Entity, &Mat), Without<Disabled>>,
+    mut state: ResMut<State>,
+) {
+    if state.time > CYCLE_TIME {
+        let mut rng = rand::rng();
+        let next_ind = if dmats.is_empty() { Some(0) } else { (0..dmats.count() - 1).choose(&mut rng) };
+        println!("next: {:#?}", next_ind);
+        let mut next = dmats.iter().next();
+        for (i, val) in dmats.iter().enumerate() {
+            if i == next_ind.unwrap() {
+                next = Some(val);
+            }
+        }
+        let enab = if dmats.is_empty() { emats.iter().skip(1) } else { emats.iter().skip(0) };
+        for (enabled, _) in enab {
+            println!("Enabled: {:#?}", enabled);
+            commands.entity(enabled).insert(Disabled);
+        }
+        next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
+        state.time = 0.0;
+        /*
+        for (_, mat) in material_mandelbrot.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_qjulia.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_ifs.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_mandelbulb.iter_mut() {
+            mat.time = 0.0;
+        }
+
+        for (_, mat) in material_sponge.iter_mut() {
+        ma.time = 0.0;
+    }
+        */
+    }
+}
+
+fn update_time(
+    time: Res<Time>,
     mut state: ResMut<State>,
     mut material_mandelbrot: ResMut<Assets<MandelbrotMaterial>>,
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
@@ -288,46 +327,6 @@ fn update_time(
 
     for (_, mat) in material_ifs.iter_mut() {
         mat.time += time.delta_secs();
-    }
-
-    if state.time > CYCLE_TIME {
-        let mut rng = rand::rng();
-        let next_ind = if dmats.is_empty() { Some(0) } else { (0..dmats.count() - 1).choose(&mut rng) };
-        println!("next: {:#?}", next_ind);
-        let mut next = dmats.iter().next();
-        for (i, val) in dmats.iter().enumerate() {
-            if i == next_ind.unwrap() {
-                next = Some(val);
-            }
-        }
-        let enab = if dmats.is_empty() { emats.iter().skip(1) } else { emats.iter().skip(0) };
-        for (enabled, _) in enab {
-            println!("Enabled: {:#?}", enabled);
-            commands.entity(enabled).insert(Disabled);
-        }
-        next.map(|(n, _)| { println!("Disabled: {:#?}", n); commands.entity(n).remove::<Disabled>(); });
-        state.time = 0.0;
-        /*
-        for (_, mat) in material_mandelbrot.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_qjulia.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_ifs.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_mandelbulb.iter_mut() {
-            mat.time = 0.0;
-        }
-
-        for (_, mat) in material_sponge.iter_mut() {
-            mat.time = 0.0;
-    }
-        */
     }
 }
 
