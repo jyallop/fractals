@@ -152,6 +152,7 @@ fn setup(
         MeshMaterial2d(material_mandelbulb.add(MandelbulbMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
+            base_color : Vec3::new(0.0, 0.0, 0.0),
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -280,6 +281,7 @@ fn update_time(
 
     for (_, mat) in material_mandelbulb.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
     }
 
     for (_, mat) in material_sponge.iter_mut() {
@@ -361,6 +363,7 @@ impl Material2d for QuatJuliaMaterial {
 struct MandelbulbMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
 }
 
 impl Material2d for MandelbulbMaterial {

@@ -18,13 +18,15 @@ alias v4 = vec4f;
 
 @group(2) @binding(0) var<uniform> resolution: v2;
 @group(2) @binding(1) var<uniform> time: f32;
+@group(2) @binding(2) var<uniform> base_color: v3;
 
 @fragment
 fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 {
 	let uv = (frag_coord.xy - 0.5 * resolution) / resolution.y;
 
-	let ro = v3(0.0, 0.0, 5.0);
+	let t = time;
+	let ro = v3(5.0 * cos(t), 0.0, 4.0 * sin(t));
 	let targ = v3(0.0);
 
 	let forward = normalize(targ - ro);
@@ -34,16 +36,15 @@ fn fragment(@builtin(position) frag_coord: v4) -> @location(0) v4
 	let focal_length = 1.5;
 	let rd = normalize(uv.x * right + uv.y * up + focal_length * forward);
 
-	let t = raymarch(ro, rd);
+	let dist = raymarch(ro, rd);
 	var color = v3(0.0, 0.0, 0.0);
 
-	if (t > 0.0)
+	if (dist > 0.0)
 	{
-		let p = ro + t * rd;
+		let p = ro + dist * rd;
 		color = shade(p);
 	}
 
-    // Normalize to [0,1]
     return v4(color, 1.0);
 }
 
@@ -78,8 +79,9 @@ fn mandelbulb_de(p : v3) -> f32
     var dr = 1.0;
     var r = 0.0;
 
-    let ITER : i32 = 100;
-    let POWER : f32 = 8.0;
+    let ITER : i32 = 16;
+	let t = 0.1 * time;
+    let POWER = abs(8.0 * sin(t));
 
     for (var i : i32 = 0; i < ITER; i++)
 	{
@@ -112,7 +114,7 @@ fn mandelbulb_de(p : v3) -> f32
 
 fn get_normal(p : v3) -> v3
 {
-    let e : f32 = 0.001;
+    let e : f32 = 0.0001;
 
     return normalize(v3(
         mandelbulb_de(p + v3(e, 0.0, 0.0)) - mandelbulb_de(p - v3(e, 0.0, 0.0)),
@@ -130,6 +132,6 @@ fn shade(p : v3) -> v3
 
     let diff = max(dot(n, l), 0.0);
 
-    return v3(0.3, 0.6, 1.0) * diff;
+    return base_color * diff;
 }
 
