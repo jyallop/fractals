@@ -76,6 +76,8 @@ fn setup(
         mu_b : Vec4::new( 0.278,  0.479,  0.0,   0.0),
         col_a : Vec3::new(0.24, 0.45, 1.0),
         col_b : Vec3::new(0.24, 0.45, 1.0),
+        s_a : 1.0,
+        s_b : 1.0,
         base_color : Vec3::new(0.24, 0.45, 1.0),
         t : 0.0,
         time : 0.0,
@@ -163,6 +165,8 @@ fn setup(
         MeshMaterial2d(material_sponge.add(MengerSpongeMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
+            base_color : Vec3::new(0.0, 0.0, 0.0),
+            sponge_s : 1.0,
         })),
         Mat,
         Transform::from_scale(Vec3::new(width, height, 1.0)),
@@ -200,6 +204,10 @@ fn update_state(
         state.col_b[0] = rng.next().unwrap();
         state.col_b[1] = rng.next().unwrap();
         state.col_b[2] = rng.next().unwrap();
+
+        state.s_a = state.s_b;
+
+        state.s_b = rng.next().unwrap();
 
         for i in 0..2 {
             let addition = &(state.col_b[i].to_string());
@@ -286,6 +294,8 @@ fn update_time(
 
     for (_, mat) in material_sponge.iter_mut() {
         mat.time += time.delta_secs();
+        mat.base_color = state.base_color;
+        mat.sponge_s = (1.0 - state.t) * state.s_a + state.t * state.s_b;
     }
 
     for (_, mat) in material_ifs.iter_mut() {
@@ -376,6 +386,8 @@ impl Material2d for MandelbulbMaterial {
 struct MengerSpongeMaterial {
     #[uniform(0)] resolution : Vec2,
     #[uniform(1)] time : f32,
+    #[uniform(2)] base_color : Vec3,
+    #[uniform(3)] sponge_s : f32,
 }
 
 impl Material2d for MengerSpongeMaterial {
@@ -402,6 +414,8 @@ struct State {
     mu_b : Vec4,
     col_a : Vec3,
     col_b : Vec3,
+    s_a : f32,
+    s_b : f32,
     base_color : Vec3,
     t : f32,
     time : f32,
