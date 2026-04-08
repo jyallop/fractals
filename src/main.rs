@@ -40,6 +40,7 @@ fn main()
         .add_plugins(Material2dPlugin::<MandelbulbMaterial>::default())
         .add_plugins(Material2dPlugin::<MengerSpongeMaterial>::default())
         .add_plugins(Material2dPlugin::<IfsMaterial>::default())
+        .add_plugins(Material2dPlugin::<MandelboxMaterial>::default())
         .add_systems(Startup, setup)
 //        .add_systems(Update, (update_time, fader, update_text))
         .add_systems(Update, (update_time, change_fractal, update_state, fader, update_text))
@@ -55,7 +56,8 @@ fn setup(
     mut material_qjulia: ResMut<Assets<QuatJuliaMaterial>>,
     mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
-    mut materials: ResMut<Assets<ColorMaterial>>
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
 )
 {
     commands.spawn(Camera2d);
@@ -155,6 +157,16 @@ fn setup(
     commands.spawn((
         Mesh2d(mesh.clone()),
         MeshMaterial2d(material_sponge.add(MengerSpongeMaterial {
+            resolution: res.clone(), // will be set next frame
+            time : 0.0,
+        })),
+        Mat,
+        Transform::from_scale(Vec3::new(width, height, 1.0)),
+    ));
+
+    commands.spawn((
+        Mesh2d(mesh.clone()),
+        MeshMaterial2d(material_mandelbox.add(MandelboxMaterial {
             resolution: res.clone(), // will be set next frame
             time : 0.0,
         })),
@@ -288,6 +300,7 @@ fn update_time(
     mut material_mandelbulb: ResMut<Assets<MandelbulbMaterial>>,
     mut material_ifs: ResMut<Assets<IfsMaterial>>,
     mut material_sponge: ResMut<Assets<MengerSpongeMaterial>>,
+    mut material_mandelbox: ResMut<Assets<MandelboxMaterial>>,
 )
 {
     state.time += time.delta_secs();
@@ -326,6 +339,10 @@ fn update_time(
     }
 
     for (_, mat) in material_ifs.iter_mut() {
+        mat.time += time.delta_secs();
+    }
+
+    for (_, mat) in material_mandelbox.iter_mut() {
         mat.time += time.delta_secs();
     }
 }
@@ -389,6 +406,18 @@ struct IfsMaterial {
 impl Material2d for IfsMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/ifs_shader.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, Asset, TypePath, Clone, Debug)]
+struct MandelboxMaterial {
+    #[uniform(0)] resolution : Vec2,
+    #[uniform(1)] time : f32,
+}
+
+impl Material2d for MandelboxMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/mandelbox_shader.wgsl".into()
     }
 }
 
